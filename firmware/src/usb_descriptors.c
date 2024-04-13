@@ -113,10 +113,9 @@ uint8_t const* tud_hid_descriptor_report_cb(uint8_t itf)
 
 enum { ITF_NUM_JOY, ITF_NUM_LED, ITF_NUM_NKRO,
        ITF_NUM_CLI, ITF_NUM_CLI_DATA,
-       ITF_NUM_AIME, ITF_NUM_AIME_DATA,
        ITF_NUM_TOTAL };
 
-#define CONFIG_TOTAL_LEN (TUD_CONFIG_DESC_LEN + TUD_HID_DESC_LEN * 3 + TUD_CDC_DESC_LEN * 2)
+#define CONFIG_TOTAL_LEN (TUD_CONFIG_DESC_LEN + TUD_HID_DESC_LEN * 3 + TUD_CDC_DESC_LEN)
 
 #define EPNUM_JOY 0x81
 #define EPNUM_LED 0x82
@@ -125,10 +124,6 @@ enum { ITF_NUM_JOY, ITF_NUM_LED, ITF_NUM_NKRO,
 #define EPNUM_CLI_NOTIF 0x85
 #define EPNUM_CLI_OUT   0x06
 #define EPNUM_CLI_IN    0x86
-
-#define EPNUM_AIME_NOTIF 0x87
-#define EPNUM_AIME_OUT   0x08
-#define EPNUM_AIME_IN    0x88
 
 uint8_t const desc_configuration_joy[] = {
     // Config number, interface count, string index, total length, attribute,
@@ -152,9 +147,6 @@ uint8_t const desc_configuration_joy[] = {
 
     TUD_CDC_DESCRIPTOR(ITF_NUM_CLI, 7, EPNUM_CLI_NOTIF,
                        8, EPNUM_CLI_OUT, EPNUM_CLI_IN, 64),
-
-    TUD_CDC_DESCRIPTOR(ITF_NUM_AIME, 8, EPNUM_AIME_NOTIF,
-                       8, EPNUM_AIME_OUT, EPNUM_AIME_IN, 64),
 };
 
 // Invoked when received GET CONFIGURATION DESCRIPTOR
@@ -178,7 +170,6 @@ const char *string_desc_arr[] = {
     "Chu Pico LED",
     "Chu Pico NKRO",
     "Chu Pico CLI Port",
-    "Chu Pico AIME Port",
 };
 
 // Invoked when received GET STRING DESCRIPTOR request

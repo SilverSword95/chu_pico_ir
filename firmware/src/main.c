@@ -21,16 +21,13 @@
 #include "tusb.h"
 #include "usb_descriptors.h"
 
-#include "aime.h"
-#include "nfc.h"
-
 #include "board_defs.h"
+
 #include "save.h"
 #include "config.h"
 #include "cli.h"
 #include "commands.h"
 
-#include "i2c_hub.h"
 #include "slider.h"
 #include "air.h"
 #include "rgb.h"
@@ -47,6 +44,8 @@ struct __attribute__((packed)) {
     uint8_t modifier;
     uint8_t keymap[15];
 } hid_nkro, sent_hid_nkro;
+
+uint16_t air_cur = 0;
 
 void report_usb_hid()
 {
@@ -77,7 +76,7 @@ static void gen_joy_report()
 
     }
     hid_joy.axis ^= 0x80808080; // some magic number from CrazyRedMachine
-    hid_joy.buttons = air_bitmap();
+    hid_joy.buttons = air_cur;
 }
 
 const uint8_t keycode_table[128][2] = { HID_ASCII_TO_KEYCODE };
@@ -113,13 +112,6 @@ static void run_lights()
     uint64_t now = time_us_64();
 
     if (now - last_hid_time >= 1000000) {
-        const uint32_t colors[] = {0x000000, 0x0000ff, 0xff0000, 0xffff00,
-                                0x00ff00, 0x00ffff, 0xffffff};
-        for (int i = 0; i < air_num(); i++) {
-            int d = air_value(i);
-            rgb_set_color(31 + i, colors[d]);
-        }
-
         for (int i = 0; i < 15; i++) {
             uint32_t color = rgb32_from_hsv(i * 573 / 15, 255, 16);
             rgb_gap_color(i, color);
@@ -132,38 +124,6 @@ static void run_lights()
         }
     }
 
-    uint32_t aime_color = aime_led_color();
-    if (aime_color > 0) {
-        uint8_t r = aime_color >> 16;
-        uint8_t g = aime_color >> 8;
-        uint8_t b = aime_color;
-
-        uint32_t blink = now / 100000;
-        aime_color = (blink & 1) ? rgb32(r, g, b, false) : 0;
-
-        rgb_set_color(34, aime_color);
-        rgb_set_color(35, aime_color);
-    }
-}
-
-const int aime_intf = 1;
-static void cdc_aime_putc(uint8_t byte)
-{
-    tud_cdc_n_write(aime_intf, &byte, 1);
-    tud_cdc_n_write_flush(aime_intf);
-}
-
-static void aime_run()
-{
-    if (tud_cdc_n_available(aime_intf)) {
-        uint8_t buf[32];
-        uint32_t count = tud_cdc_n_read(aime_intf, buf, sizeof(buf));
-
-        i2c_select(I2C_PORT, 1 << 5); // PN532 on IR1 (I2C mux chn 5)
-        for (int i = 0; i < count; i++) {
-            aime_feed(buf[i]);
-        }
-    }
 }
 
 static mutex_t core1_io_lock;
@@ -176,6 +136,7 @@ static void core1_loop()
             mutex_exit(&core1_io_lock);
         }
         cli_fps_count(1);
+        air_cur = get_sensor_readings();
         sleep_ms(1);
     }
 }
@@ -186,13 +147,11 @@ static void core0_loop()
         tud_task();
 
         cli_run();
-        aime_run();
     
         save_loop();
         cli_fps_count(0);
 
         slider_update();
-        air_update();
 
         gen_joy_report();
         gen_nkro_report();
@@ -215,13 +174,6 @@ void init()
     slider_init();
     air_init();
     rgb_init();
-
-    nfc_attach_i2c(I2C_PORT);
-    i2c_select(I2C_PORT, 1 << 5); // PN532 on IR1 (I2C mux chn 5)
-    nfc_init();
-    aime_init(cdc_aime_putc);
-    aime_virtual_aic(chu_cfg->aime.virtual_aic);
-    aime_set_mode(chu_cfg->aime.mode);
 
     cli_init("chu_pico>", "\n   << Chu Pico Controller >>\n"
                             " https://github.com/whowechina\n\n");
